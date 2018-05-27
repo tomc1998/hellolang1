@@ -1,15 +1,17 @@
-module Ast (parseTreeToAst, AstNode(AstNode),
-            AstNodeData(Assignment, FunctionCall, If, While, Operator,
-                        CmpOperator, Literal, Variable, Program),
-             Operator(Add, Sub, Mul, Div),
-             CmpOperator(Eq, Gt, Ge, Lt, Le, LAnd, LOr)) where
+module Ast (parseTreeToAst, AstNode(AstNode)
+           ,AstNodeData(Assignment, FunctionCall, If, While, Operator,
+                         CmpOperator, Literal, Variable, Program)
+           ,Operator(Add, Sub, Mul, Div)
+           ,CmpOperator(Neq, Eq, Gt, Ge, Lt, Le)
+           ,BoolOperator(LAnd, LOr)) where
 
 import Debug.Trace (trace)
 import Parse hiding (Assignment, FunctionCall, Literal, Program)
 import qualified Parse (NTermType(Assignment, FunctionCall, Literal, Program))
 
-data Operator = Add | Sub | Mul | Div deriving (Show)
-data CmpOperator = Eq | Gt | Ge | Lt | Le | LAnd | LOr deriving (Show)
+data Operator = Add | Sub | Mul | Div deriving (Show, Eq)
+data CmpOperator = Neq | Eq | Gt | Ge | Lt | Le deriving (Show, Eq)
+data BoolOperator = LAnd | LOr deriving (Show, Eq)
 
 data AstNodeData = Assignment
   | FunctionCall String
@@ -17,6 +19,7 @@ data AstNodeData = Assignment
   | While
   | Operator Operator
   | CmpOperator CmpOperator
+  | BoolOperator BoolOperator
   | Literal Float
   | Variable String
   | Program
@@ -37,8 +40,10 @@ parseCmpOperator ">" = Gt
 parseCmpOperator ">=" = Ge
 parseCmpOperator "<" = Lt
 parseCmpOperator "<=" = Le
-parseCmpOperator "&&" = LAnd
-parseCmpOperator "||" = LOr
+
+parseBoolOperator :: String -> BoolOperator
+parseBoolOperator "&&" = LAnd
+parseBoolOperator "||" = LOr
 
 
 parseTreeToAst :: PNode -> AstNode
@@ -74,7 +79,7 @@ parseTreeToAst (NTerm Expression [term, Terminal op, expr]) =
   AstNode (Operator $ parseOperator op) [parseTreeToAst term, parseTreeToAst expr]
 parseTreeToAst (NTerm BooleanExpression [term]) = parseTreeToAst term
 parseTreeToAst (NTerm BooleanExpression [term, Terminal op, expr]) =
-  AstNode (CmpOperator $ parseCmpOperator op) [parseTreeToAst term, parseTreeToAst expr]
+  AstNode (BoolOperator $ parseBoolOperator op) [parseTreeToAst term, parseTreeToAst expr]
 
 parseTreeToAst (NTerm Term [v]) = parseTreeToAst v
 parseTreeToAst (NTerm Term [v, Terminal op, term]) =

@@ -5,6 +5,8 @@ import Lib
 import System.Environment (getArgs)
 import System.IO (readFile)
 
+import Control.Monad.State.Lazy
+
 import qualified Lex
 import qualified Parse
 import qualified Ast
@@ -17,6 +19,6 @@ main = do
   tokens <- return $ foldr (++) [] $ map Lex.lex files
   parseTree <- return $ Parse.parse tokens
   ast <- return $ Ast.parseTreeToAst parseTree
-  ir <- return $ Ir.astToIr ast
+  ir <- return $ fst $ runState (Ir.astToIr ast) 0
   print ast
   mapM_ print ir
