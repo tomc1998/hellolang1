@@ -12,6 +12,7 @@ consumeNumber (i:is)
   | otherwise = ("", i:is)
 
 lex :: String -> [Token.Token]
+lex [] = []
 lex (i:is)
   | Data.Char.isSpace i = Lex.lex is
   | i == ';'
@@ -34,14 +35,12 @@ lex (i:is)
       else if head is == '='
            then (Token.Token [i, head is] Token.Operator) : Lex.lex (tail is)
            else (Token.Token [i] Token.Operator) : Lex.lex is
-  | untilSpace == "if" || untilSpace == "while"
-  = (Token.Token untilSpace Token.Keyword) : Lex.lex restAfterSpace
+  | untilNonIdent == "if" || untilNonIdent == "while"
+  = (Token.Token untilNonIdent Token.Keyword) : Lex.lex restAfterNonIdent
   | otherwise
-  = (Token.Token untilSpace Token.Identifier) : Lex.lex restAfterSpace
+  = (Token.Token untilNonIdent Token.Identifier) : Lex.lex restAfterNonIdent
   where
-    untilSpace :: String
-    untilSpace = takeWhile (not . Data.Char.isSpace) (i:is)
-    restAfterSpace :: String
-    restAfterSpace = dropWhile (not . Data.Char.isSpace) (i:is)
-
-
+    restAfterNonIdent :: String
+    restAfterNonIdent = dropWhile Data.Char.isAlpha (i:is)
+    untilNonIdent :: String
+    untilNonIdent = takeWhile Data.Char.isAlpha (i:is)
