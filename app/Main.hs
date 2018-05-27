@@ -7,6 +7,7 @@ import System.IO (readFile)
 
 import qualified Lex
 import qualified Parse
+import qualified Ast
 
 main :: IO ()
 main = do
@@ -14,4 +15,5 @@ main = do
   files <- mapM readFile args
   tokens <- return $ foldr (++) [] $ map Lex.lex files
   parseTree <- return $ Parse.parse tokens
-  print parseTree
+  ast <- return $ Ast.parseTreeToAst parseTree
+  print ast

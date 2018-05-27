@@ -1,8 +1,14 @@
-module Parse (parse) where
+module Parse (parse
+             ,PNode(NTerm, Terminal)
+             ,NTermType(Program ,Stmt ,Assignment ,Expression ,Term ,Literal
+                       ,Digit ,FunctionCall ,ParameterList ,Parameter ,Control
+                       ,ControlKeyword ,BooleanExpression ,BooleanTerm
+                       ,Identifier ,BooleanOperator ,ComparisonOperator)) where
 
 import qualified Token
 data NTermType =
   Program
+  | Identifier
   | Stmt
   | Assignment
   | Expression
@@ -18,11 +24,11 @@ data NTermType =
   | BooleanTerm
   | BooleanOperator
   | ComparisonOperator
-  deriving (Show)
+  deriving (Show, Eq)
 
 -- |A parse tree node
 data PNode = NTerm NTermType [PNode] | Terminal String
-  deriving (Show)
+  deriving (Show, Eq)
 
 fromToken :: Token.Token -> PNode
 fromToken t = Terminal $ Token.tokVal t
@@ -34,8 +40,11 @@ parseTerm (t0:t1:ts)
   | Token.tokType t0 /= Token.Identifier &&
     Token.tokType t0 /= Token.Literal
   = error $ "Expected identifier or literal, got " ++ (show t0)
-  | (op /= "*" && op /= "/") = (NTerm Term [fromToken t0], t1:ts)
-  | otherwise = (NTerm Term [fromToken t0, Terminal op, term], rest)
+  | (op /= "*" && op /= "/") =
+    if Token.tokType t0 == Token.Literal
+      then (NTerm Term [fromToken t0], t1:ts)
+      else (NTerm Term [NTerm Identifier [fromToken t0]], t1:ts)
+  | otherwise = (NTerm Term [NTerm Identifier [fromToken t0], Terminal op, term], rest)
   where
     op = Token.tokVal t1
     (term, rest) = parseTerm ts
@@ -76,7 +85,7 @@ parseFunctionCall _ = error "Unexpected EOF"
 
 parseAssignment :: Parser
 parseAssignment (t0:t1:ts) =
-  (NTerm Assignment [fromToken t0, fromToken t1, expr], rest)
+  (NTerm Assignment [NTerm Identifier [fromToken t0], fromToken t1, expr], rest)
   where (expr, rest) = parseExpression ts
 parseAssignment _ = error "Unexpected EOF"
 
@@ -94,7 +103,7 @@ parseBooleanTerm (t:ts)
     (expr0, expr0Rest) = parseExpression (t:ts)
     (expr1, expr1Rest) = parseExpression $ tail expr0Rest
     -- This is used when the head token is the ! operator
-    (unaryOpTerm, unaryOpTermRest) = parseTerm ts
+    (unaryOpTerm, unaryOpTermRest) = parseBooleanTerm ts
 
 parseBooleanExpression :: Parser
 parseBooleanExpression ts
