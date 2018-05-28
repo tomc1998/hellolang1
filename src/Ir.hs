@@ -1,25 +1,19 @@
 module Ir (astToIr) where
 
-import Control.Monad.State.Lazy (State, get, put)
+import Control.Monad.State.Lazy (State)
 import Data.Foldable
 import Ast hiding (Variable, Add)
 import qualified Ast
-import SymbolTable
+import SymbolTable hiding (Label)
+import qualified SymbolTable
 
 data OpCode = Store | Load | Mul | Add | Sub | Div | Cmp
   | Je | Jne | Jg | Jl | Jge | Jle deriving (Show)
 data Operand = Variable Symbol | Immf Float | Immi Int | Acc
-  | Temp Int | EmptyOperand deriving (Show)
+  | Temp Int | EmptyOperand | JumpLabel Symbol deriving (Show)
 
 -- |Data to represent an IR instruction
-data IrInstr = IrInstr OpCode Operand Operand | Label Int deriving (Show)
-
--- |Generate an IR label
-genLabel :: State Int (IrInstr, Int)
-genLabel = do
-  labelNum <- get
-  put $ labelNum + 1
-  return (Label labelNum, labelNum)
+data IrInstr = IrInstr OpCode Operand Operand | Label Symbol deriving (Show)
 
 -- |Gen instruction to store acc in temp var
 stoTmp :: Int -> IrInstr
@@ -38,18 +32,18 @@ invertOp op
 -- |Convert a comparison operator to a jump instruction. Pass a label to jump
 -- to, and a bool which should be set to 'true' to 'invert' the generation (i.e.
 -- generate jne if the op is eq, le if the op is gt)
-cmpOpToIrInstr :: CmpOperator -> Int -> Bool -> IrInstr
+cmpOpToIrInstr :: CmpOperator -> Symbol -> Bool -> IrInstr
 cmpOpToIrInstr op label invert
-  | realOp == Eq = IrInstr Je (Immi label) EmptyOperand
-  | realOp == Neq = IrInstr Jne (Immi label) EmptyOperand
-  | realOp == Gt = IrInstr Jg (Immi label) EmptyOperand
-  | realOp == Ge = IrInstr Jge (Immi label) EmptyOperand
-  | realOp == Lt = IrInstr Jl (Immi label) EmptyOperand
-  | realOp == Le = IrInstr Jle (Immi label) EmptyOperand
+  | realOp == Eq = IrInstr Je (JumpLabel label) EmptyOperand
+  | realOp == Neq = IrInstr Jne (JumpLabel label) EmptyOperand
+  | realOp == Gt = IrInstr Jg (JumpLabel label) EmptyOperand
+  | realOp == Ge = IrInstr Jge (JumpLabel label) EmptyOperand
+  | realOp == Lt = IrInstr Jl (JumpLabel label) EmptyOperand
+  | realOp == Le = IrInstr Jle (JumpLabel label) EmptyOperand
   where realOp = if invert then invertOp op else op
 
 -- |Convert an AST to an intermediate representation
-astToIr :: AstNode -> State Int [IrInstr]
+astToIr :: AstNode -> State SymbolTable [IrInstr]
 
 astToIr (AstNode Program children) = do
   childrenIr <- mapM astToIr children
@@ -78,20 +72,26 @@ astToIr (AstNode (CmpOperator op) [lhs, rhs]) = do
 
 astToIr (AstNode If [(AstNode (CmpOperator op) expr), thenBody]) = do
   -- Generate a 'false' label for jumping to
-  (endLabelInstr, endLabel) <- genLabel
+  sym <- genSym
+  labelInstr <- return $ Label sym
+  putSym sym SymbolTable.Label
   -- Generate code for expr & body
   exprIr <- astToIr $ AstNode (CmpOperator op) expr
   bodyIr <- astToIr thenBody
   -- Assemble
-  return $ exprIr ++ [cmpOpToIrInstr op endLabel True] ++ bodyIr ++ [endLabelInstr]
+  return $ exprIr ++ [cmpOpToIrInstr op sym True] ++ bodyIr ++ [labelInstr]
 
 astToIr (AstNode While [(AstNode (CmpOperator op) expr), body]) = do
   -- Gen 2 labels, a start & end
-  (startLabelInstr, startLabel) <- genLabel
-  (endLabelInstr, endLabel) <- genLabel
+  startSym <- genSym
+  endSym <- genSym
+  startInstr <- return $ Label startSym
+  endInstr <- return $ Label endSym
+  putSym startSym SymbolTable.Label
+  putSym endSym SymbolTable.Label
   -- Gen code for expr & body
   exprIr <- astToIr $ AstNode (CmpOperator op) expr
   bodyIr <- astToIr body
   -- Assemble
-  return $ (startLabelInstr:exprIr) ++ [cmpOpToIrInstr op endLabel True]
-    ++ bodyIr ++ [endLabelInstr]
+  return $ (startInstr:exprIr) ++ [cmpOpToIrInstr op endSym True]
+    ++ bodyIr ++ [endInstr]
