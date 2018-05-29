@@ -8,9 +8,9 @@ import SymbolTable hiding (Label)
 import qualified SymbolTable
 
 data OpCode = Store | Load | Mul | Add | Sub | Div | Cmp
-  | Je | Jne | Jg | Jl | Jge | Jle deriving (Show)
+  | Je | Jne | Jg | Jl | Jge | Jle | Call deriving (Show)
 data Operand = Variable Symbol | Immf Float | Immi Int | Acc
-  | Temp Int | EmptyOperand | JumpLabel Symbol deriving (Show)
+  | Temp Int | Param Int | EmptyOperand | JumpLabel Symbol deriving (Show)
 
 -- |Data to represent an IR instruction
 data IrInstr = IrInstr OpCode Operand Operand | Label Symbol deriving (Show)
@@ -18,6 +18,10 @@ data IrInstr = IrInstr OpCode Operand Operand | Label Symbol deriving (Show)
 -- |Gen instruction to store acc in temp var
 stoTmp :: Int -> IrInstr
 stoTmp x = IrInstr Store (Temp x) Acc
+
+-- |Gen instruction to store acc in param var
+stoParam :: Int -> IrInstr
+stoParam x = IrInstr Store (Param x) Acc
 
 -- |Get an operator which is the reverse of the given one.
 invertOp :: CmpOperator -> CmpOperator
@@ -95,3 +99,12 @@ astToIr (AstNode While [(AstNode (CmpOperator op) expr), body]) = do
   -- Assemble
   return $ (startInstr:exprIr) ++ [cmpOpToIrInstr op endSym True]
     ++ bodyIr ++ [endInstr]
+
+astToIr (AstNode (FunctionCall name) parameters) = do
+  -- evaluate all the parameters
+  evaluated <- mapM astToIr parameters
+  zipped <- return $ zip [0..] evaluated
+  -- fold all the parameters & add them to the param variables
+  folded <- return $ foldl (\list (num, param) -> list ++ param ++ [stoParam num]) [] zipped
+  -- Now return the final function call
+  return $ folded ++ [IrInstr Call (JumpLabel name) EmptyOperand]
