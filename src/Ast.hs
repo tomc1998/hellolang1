@@ -48,18 +48,18 @@ parseBoolOperator "||" = LOr
 
 parseTreeToAst :: PNode -> AstNode
 
-parseTreeToAst (NTerm Parse.Assignment children) =
-  AstNode Assignment [
-      parseTreeToAst $ children !! 0,
-      parseTreeToAst $ children !! 2
-  ]
-
 parseTreeToAst (NTerm Parse.Program statements) =
   AstNode Program $ map parseTreeToAst filtered
   where filtered = filter (/= (Terminal ";")) statements
 
 parseTreeToAst (NTerm Parse.Stmt [child]) =
   parseTreeToAst child
+
+parseTreeToAst (NTerm Parse.Assignment children) =
+  AstNode Assignment [
+      parseTreeToAst $ children !! 0,
+      parseTreeToAst $ children !! 2
+  ]
 
 parseTreeToAst (NTerm Identifier [Terminal term]) = AstNode (Variable term) []
 
@@ -88,5 +88,3 @@ parseTreeToAst (NTerm Term [v, Terminal op, term]) =
 parseTreeToAst (NTerm BooleanTerm [v]) = parseTreeToAst v
 parseTreeToAst (NTerm BooleanTerm [expr0, Terminal op, expr1]) =
   AstNode (CmpOperator $ parseCmpOperator op) [parseTreeToAst expr0, parseTreeToAst expr1]
-
-

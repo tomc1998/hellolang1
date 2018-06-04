@@ -6,7 +6,6 @@ import System.Environment (getArgs)
 import System.IO (readFile)
 
 import Control.Monad.State.Lazy
-import Control.Monad.Reader (runReader)
 
 import qualified Lex
 import qualified Parse
@@ -22,8 +21,8 @@ main = do
   tokens <- return $ foldr (++) [] $ map Lex.lex files
   parseTree <- return $ Parse.parse tokens
   ast <- return $ Ast.parseTreeToAst parseTree
-  (ir, table) <- return $ runState (Ir.astToIr ast) SymbolTable.newSymbolTable
-  mapM_ (putStrLn . show) ir
-  asm <- return $ runReader (SynthesisGas.synthesise ir) table
-  putStrLn "\nGENERATED ASM:\n"
-  putStrLn asm
+  (ir, table) <- return $ runState (Ir.generateIr ast) SymbolTable.newSymbolTable
+  dataSection <- return $ fst $ runState Ir.initImmediate table
+  asm <- return $ fst $ runState (SynthesisGas.synthesise dataSection ir) table
+  putStrLn "Writing to out.s"
+  writeFile "out.s" asm

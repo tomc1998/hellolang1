@@ -2,3 +2,5 @@
 hellolang.cabal
 *~
 .projectile
+out.s
+a.out
